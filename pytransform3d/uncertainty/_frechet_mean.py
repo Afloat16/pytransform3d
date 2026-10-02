@@ -109,6 +109,9 @@ def frechet_mean(
         mean_diffs = log(concat_many_to_one(samples, inv(mean)))
         avg_mean_diff = np.mean(mean_diffs, axis=0)
         mean = concat_one_to_one(mean, exp(avg_mean_diff))
+    # The final update moves the base point of the tangent space. Residuals
+    # used for covariance estimation must be evaluated at the returned mean.
+    mean_diffs = log(concat_many_to_one(samples, inv(mean)))
     return mean, mean_diffs
 
 

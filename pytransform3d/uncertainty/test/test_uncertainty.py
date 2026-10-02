@@ -262,3 +262,46 @@ def test_projected_ellipsoid():
     r = np.linalg.norm(P, axis=1)
     assert np.all(r >= 1.0)
     assert np.all(r <= 2.0)
+
+
+@pytest.mark.parametrize("n_iter", [0, 1, 3])
+def test_frechet_mean_residuals_at_returned_mean(n_iter):
+    # In the additive group, exp and log are identities.
+    samples = np.array([[1.0], [3.0]])
+    mean, diffs = pu.frechet_mean(
+        samples,
+        np.zeros(1),
+        exp=lambda x: x,
+        log=lambda x: x,
+        inv=lambda x: -x,
+        concat_one_to_one=lambda x, y: x + y,
+        concat_many_to_one=lambda x, y: x + y,
+        n_iter=n_iter,
+    )
+    assert_array_almost_equal(mean, [0.0] if n_iter == 0 else [2.0])
+    assert_array_almost_equal(diffs, samples - mean)
+
+
+def test_frechet_mean_rotation_residuals():
+    from scipy.spatial.transform import Rotation
+
+    samples = Rotation.from_rotvec(
+        [
+            [0.7, 0.0, 0.0],
+            [0.0, 0.6, 0.0],
+            [0.0, 0.0, -0.5],
+        ]
+    ).as_matrix()
+    mean, diffs = pu.frechet_mean(
+        samples,
+        np.eye(3),
+        exp=lambda x: Rotation.from_rotvec(x).as_matrix(),
+        log=lambda x: Rotation.from_matrix(x).as_rotvec(),
+        inv=lambda x: x.T,
+        concat_one_to_one=lambda x, y: y @ x,
+        concat_many_to_one=lambda x, y: x @ y,
+        n_iter=1,
+    )
+    # Residuals live at mean_1, rather than at the initial identity.
+    expected = Rotation.from_matrix(samples @ mean.T).as_rotvec()
+    assert_array_almost_equal(diffs, expected)
