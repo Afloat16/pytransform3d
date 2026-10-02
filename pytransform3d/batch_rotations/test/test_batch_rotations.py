@@ -861,14 +861,14 @@ def test_batch_concatenate_quaternions_mismatch():
     Q1 = np.zeros((1, 2, 3, 3))
     Q2 = np.zeros((1, 2, 3, 4))
     with pytest.raises(
-        ValueError, match="Last dimension of first argument does not " "match."
+        ValueError, match="Last dimension of first argument does not match."
     ):
         pbr.batch_concatenate_quaternions(Q1, Q2)
 
     Q1 = np.zeros((1, 2, 3, 4))
     Q2 = np.zeros((1, 2, 3, 3))
     with pytest.raises(
-        ValueError, match="Last dimension of second argument does " "not match."
+        ValueError, match="Last dimension of second argument does not match."
     ):
         pbr.batch_concatenate_quaternions(Q1, Q2)
 
@@ -961,3 +961,33 @@ def test_smooth_quaternion_trajectory_empty():
         ValueError, match=r"At least one quaternion is expected"
     ):
         pbr.smooth_quaternion_trajectory(np.zeros((0, 4)))
+
+
+@pytest.mark.parametrize("shape", [(4,), (2, 3, 4)])
+@pytest.mark.parametrize("alias", ["first", "second", "overlap"])
+def test_batch_concatenate_quaternions_alias(shape, alias):
+    rng = np.random.default_rng(85)
+    storage = rng.normal(size=shape[:-1] + (5,))
+    q1 = storage[..., :4]
+    q2 = rng.normal(size=shape)
+    # Independent scalar Hamilton multiplication for each quaternion pair.
+    expected = np.empty(shape)
+    for index in np.ndindex(shape[:-1]):
+        w1, x1, y1, z1 = q1[index]
+        w2, x2, y2, z2 = q2[index]
+        expected[index] = [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ]
+    out = (
+        q1
+        if alias == "first"
+        else q2
+        if alias == "second"
+        else storage[..., 1:]
+    )
+    result = pbr.batch_concatenate_quaternions(q1, q2, out=out)
+    assert result is out
+    assert_array_almost_equal(result, expected)

@@ -128,12 +128,15 @@ def batch_concatenate_quaternions(Q1, Q2, out=None):
         out = np.empty_like(Q1)
 
     vector_inner_products = np.sum(Q1[..., 1:] * Q2[..., 1:], axis=-1)
-    out[..., 0] = Q1[..., 0] * Q2[..., 0] - vector_inner_products
-    out[..., 1:] = (
+    # Compute both components before writing: out may alias either input.
+    scalar = Q1[..., 0] * Q2[..., 0] - vector_inner_products
+    vector = (
         Q1[..., 0, np.newaxis] * Q2[..., 1:]
         + Q2[..., 0, np.newaxis] * Q1[..., 1:]
         + np.cross(Q1[..., 1:], Q2[..., 1:])
     )
+    out[..., 0] = scalar
+    out[..., 1:] = vector
     return out
 
 
